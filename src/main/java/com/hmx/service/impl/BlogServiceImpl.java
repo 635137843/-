@@ -18,13 +18,10 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import javax.persistence.criteria.CriteriaBuilder;
-import javax.persistence.criteria.CriteriaQuery;
-import javax.persistence.criteria.Predicate;
-import javax.persistence.criteria.Root;
-import java.util.ArrayList;
-import java.util.Date;
-import java.util.List;
+import javax.persistence.criteria.*;
+import java.util.*;
+import java.util.function.ToIntFunction;
+import java.util.stream.Collectors;
 
 /**
  * @ClassName BlogServiceImpl
@@ -87,6 +84,17 @@ public class BlogServiceImpl implements BlogService {
     }
 
     @Override
+    public Page<Blog> listBlog(Long tagId, Pageable pageable) {
+        return blogRepository.findAll(new Specification<Blog>() {
+            @Override
+            public Predicate toPredicate(Root<Blog> root, CriteriaQuery<?> criteriaQuery, CriteriaBuilder criteriaBuilder) {
+                Join join = root.join("tags");
+                return criteriaBuilder.equal(join.get("id"), tagId);
+            }
+        }, pageable);
+    }
+
+    @Override
     public Page<Blog> listBlog(String query, Pageable pageable) {
         return blogRepository.findByQuery(query, pageable);
     }
@@ -95,6 +103,24 @@ public class BlogServiceImpl implements BlogService {
     public List<Blog> listRecommendBlogTop(Integer size) {
         Pageable pageable = PageRequest.of(0, size, Sort.by(Sort.Direction.DESC, "updateTime"));
         return blogRepository.findTop(pageable);
+    }
+
+    @Override
+    public List<Map.Entry<String, List<Blog>>> archiveBlog() {
+        List<String> years = blogRepository.findByGroup();
+        Map<String, List<Blog>> map = new HashMap<>();
+        for (String year : years) {
+            map.put(year, blogRepository.findByYear(year));
+        }
+
+        List<Map.Entry<String, List<Blog>>> list = new ArrayList<>(map.entrySet());
+        Collections.sort(list, (o1, o2) -> Integer.parseInt(o2.getKey()) - Integer.parseInt(o1.getKey()));
+        return list;
+    }
+
+    @Override
+    public Long countBlog() {
+        return blogRepository.count();
     }
 
     @Transactional
